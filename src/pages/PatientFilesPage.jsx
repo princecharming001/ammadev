@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { supabase } from '../supabaseClient'
-import { getCurrentSession, logout } from '../sessionManager'
-import './Profile.css'
+import { supabase } from '../utils/supabaseClient'
+import { getCurrentSession, logout } from '../utils/sessionManager'
+import '../components/Profile.css'
 
 function PatientFilesPage() {
   const navigate = useNavigate()

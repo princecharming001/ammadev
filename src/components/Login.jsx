@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
 import { jwtDecode } from 'jwt-decode'
-import { supabase } from '../supabaseClient'
-import { createSession } from '../sessionManager'
+import { supabase } from '../utils/supabaseClient'
+import { createSession } from '../utils/sessionManager'
 import './Login.css'
 
 function Login() {

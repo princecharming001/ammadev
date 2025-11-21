@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { supabase } from '../supabaseClient'
+import { supabase } from '../utils/supabaseClient'
 import './Profile.css'
 
 function Profile() {

@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   base: '/ammalanding/', // GitHub Pages repo path (non-custom domain)
   build: {
-    outDir: 'dist',
+    outDir: 'docs',
     emptyOutDir: true,
     sourcemap: false
   }
