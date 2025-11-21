@@ -5,10 +5,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: '/', // Custom domain (amma.today) - use root path
+  publicDir: 'public', // Ensure public directory is copied
   build: {
     outDir: 'docs',
     emptyOutDir: true,
     sourcemap: false,
-    assetsDir: 'assets'
+    assetsDir: 'assets',
+    copyPublicDir: true // Explicitly copy public files
   }
 })
