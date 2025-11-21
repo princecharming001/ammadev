@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && cp CNAME docs/CNAME",
+    "build": "vite build && cp CNAME docs/CNAME && cp -r public/images docs/images",
     "lint": "eslint .",
     "preview": "vite preview",
     "deploy": "npm run build && git add -A && git commit -m 'Deploy updates' && git push origin main"
