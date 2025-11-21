@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../utils/supabaseClient'
 import { getCurrentSession, logout } from '../utils/sessionManager'
+import { isValidPatientKey, unformatPatientKey, formatPatientKey } from '../utils/keyGenerator'
 import '../components/Profile.css'
 
 function DoctorProfile() {
@@ -11,7 +12,7 @@ function DoctorProfile() {
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [patientEmail, setPatientEmail] = useState('')
+  const [patientKey, setPatientKey] = useState('')
 
   useEffect(() => {
     checkSessionAndLoadData()
@@ -67,40 +68,67 @@ function DoctorProfile() {
   }
 
   const addPatient = async () => {
-    if (!patientEmail.trim()) {
-      alert('Please enter a patient email')
+    const cleanKey = unformatPatientKey(patientKey)
+    
+    if (!cleanKey) {
+      alert('Please enter a patient key')
+      return
+    }
+    
+    if (!isValidPatientKey(cleanKey)) {
+      alert('Invalid patient key. Must be 9 digits.')
       return
     }
     
     // Check if already added
-    if (patients.some(p => p.email === patientEmail.trim())) {
+    if (patients.some(p => p.patient_key === cleanKey)) {
       alert('Patient already added!')
       return
     }
 
-    const newPatient = {
-      doctor_email: userEmail,
-      patient_email: patientEmail.trim(),
-      patient_name: patientEmail.split('@')[0],
-      patient_avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${patientEmail}`
-    }
+    try {
+      // First, verify the patient key exists and get patient info
+      const { data: patientData, error: patientError } = await supabase
+        .from('users')
+        .select('email, first_name, last_name, patient_key')
+        .eq('patient_key', cleanKey)
+        .eq('user_type', 'patient')
+        .single()
 
-    const { data, error } = await supabase
-      .from('doctor_patients')
-      .insert([newPatient])
-    
-    if (error) {
-      console.error('Error adding patient:', error)
-      alert('❌ Error syncing patient: ' + error.message)
-      return
-    }
+      if (patientError || !patientData) {
+        alert('❌ Patient key not found. Please check and try again.')
+        return
+      }
 
-    // Reload patients from database
-    await loadPatients(userEmail)
-    
-    setPatientEmail('')
-    setShowModal(false)
-    alert('Patient synced successfully! ✅')
+      // Create doctor-patient link using patient_key
+      const newPatient = {
+        doctor_email: userEmail,
+        patient_email: patientData.email, // Keep for backward compatibility
+        patient_key: cleanKey,
+        patient_name: `${patientData.first_name} ${patientData.last_name}`,
+        patient_avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${patientData.email}`
+      }
+
+      const { error } = await supabase
+        .from('doctor_patients')
+        .insert([newPatient])
+      
+      if (error) {
+        console.error('Error adding patient:', error)
+        alert('❌ Error syncing patient: ' + error.message)
+        return
+      }
+
+      // Reload patients from database
+      await loadPatients(userEmail)
+      
+      setPatientKey('')
+      setShowModal(false)
+      alert(`Patient ${patientData.first_name} ${patientData.last_name} synced successfully! ✅`)
+    } catch (error) {
+      console.error('Error syncing patient:', error)
+      alert('❌ Error: ' + error.message)
+    }
   }
 
   const handleLogout = async () => {
@@ -320,27 +348,34 @@ function DoctorProfile() {
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
           }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: '#1a1a1a' }}>
-              Sync with Patient
+              🔐 Sync with Patient
             </h3>
             <p style={{ fontSize: '0.95rem', color: '#666', marginBottom: '1.5rem' }}>
-              Enter patient's email to sync with their account
+              Enter the patient's 9-digit key to securely sync profiles
             </p>
             <input
-              type="email"
-              value={patientEmail}
-              onChange={(e) => setPatientEmail(e.target.value)}
-              placeholder="patient@email.com"
+              type="text"
+              value={patientKey}
+              onChange={(e) => setPatientKey(e.target.value)}
+              placeholder="123-456-789 or 123456789"
+              maxLength="11"
               style={{
                 width: '100%',
                 padding: '0.875rem',
-                fontSize: '1rem',
+                fontSize: '1.25rem',
                 borderRadius: '8px',
-                border: '1px solid #e0e0e0',
+                border: '2px solid #e0e0e0',
                 marginBottom: '1rem',
-                fontFamily: 'inherit'
+                fontFamily: 'monospace',
+                textAlign: 'center',
+                letterSpacing: '0.1em',
+                fontWeight: '600'
               }}
               onKeyPress={(e) => e.key === 'Enter' && addPatient()}
             />
+            <p style={{ fontSize: '0.8rem', color: '#999', marginBottom: '1rem', textAlign: 'center' }}>
+              Ask your patient for their secure key from their profile
+            </p>
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button
                 onClick={() => setShowModal(false)}

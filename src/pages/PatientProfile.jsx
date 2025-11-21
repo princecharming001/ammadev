@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../utils/supabaseClient'
 import { getCurrentSession, logout } from '../utils/sessionManager'
+import { formatPatientKey, copyToClipboard } from '../utils/keyGenerator'
 import '../components/Profile.css'
 
 function PatientProfile() {
   const navigate = useNavigate()
   const [userName, setUserName] = useState('Patient')
   const [userEmail, setUserEmail] = useState('')
+  const [patientKey, setPatientKey] = useState('')
+  const [keyCopied, setKeyCopied] = useState(false)
   const [files, setFiles] = useState([])
   const [videoUrl, setVideoUrl] = useState('')
   const [loading, setLoading] = useState(true)
@@ -33,11 +36,30 @@ function PatientProfile() {
       console.log('✅ Valid patient session found')
       setUserName(session.name)
       setUserEmail(session.email)
+      await loadPatientKey(session.email)
       loadFiles(session.email)
     } catch (error) {
       console.error('❌ Error checking session:', error)
       alert('Error loading profile: ' + error.message)
       navigate('/login')
+    }
+  }
+
+  const loadPatientKey = async (email) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('patient_key')
+        .eq('email', email)
+        .eq('user_type', 'patient')
+        .single()
+
+      if (error) throw error
+      if (data && data.patient_key) {
+        setPatientKey(data.patient_key)
+      }
+    } catch (error) {
+      console.log('Error loading patient key:', error)
     }
   }
 
@@ -61,6 +83,14 @@ function PatientProfile() {
       console.log('Error loading files:', error)
     }
     setLoading(false)
+  }
+
+  const handleCopyKey = async () => {
+    const success = await copyToClipboard(patientKey)
+    if (success) {
+      setKeyCopied(true)
+      setTimeout(() => setKeyCopied(false), 2000)
+    }
   }
 
   const handleLogout = async () => {
@@ -120,6 +150,57 @@ function PatientProfile() {
             </button>
           </div>
         </div>
+
+        {/* Patient Key Display */}
+        {patientKey && (
+          <div style={{
+            background: 'linear-gradient(135deg, #E879F9 0%, #A855F7 100%)',
+            borderRadius: '16px',
+            padding: '2rem',
+            marginBottom: '2rem',
+            boxShadow: '0 8px 24px rgba(232, 121, 249, 0.2)',
+            color: 'white'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '0.875rem', fontWeight: '600', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '1rem', opacity: 0.9 }}>
+                🔐 Your Secure Patient Key
+              </p>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                marginBottom: '1rem',
+                backdropFilter: 'blur(10px)'
+              }}>
+                <p style={{ fontSize: '2.5rem', fontWeight: '800', letterSpacing: '0.1em', fontFamily: 'monospace' }}>
+                  {formatPatientKey(patientKey)}
+                </p>
+              </div>
+              <button
+                onClick={handleCopyKey}
+                style={{
+                  padding: '0.75rem 2rem',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#A855F7',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                }}
+                onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                {keyCopied ? '✓ Copied!' : '📋 Copy Key'}
+              </button>
+              <p style={{ fontSize: '0.875rem', marginTop: '1rem', opacity: 0.9 }}>
+                Share this key with your doctor to sync your profiles securely
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Files and Video Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
