@@ -105,8 +105,9 @@ function Login() {
             <div style={{
               position: 'absolute',
               top: 0,
-              left: 0,
-              right: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 'calc(100% - 2px)',
               height: '6px',
               background: 'linear-gradient(135deg, #E879F9 0%, #A855F7 100%)',
               borderRadius: '24px 24px 0 0'
@@ -118,14 +119,22 @@ function Login() {
               height: '80px',
               margin: '0 auto 1.5rem',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #E879F9 0%, #A855F7 100%)',
+              background: 'white',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '2.5rem',
-              boxShadow: '0 8px 24px rgba(232, 121, 249, 0.3)'
+              boxShadow: '0 8px 24px rgba(232, 121, 249, 0.3)',
+              border: '3px solid rgba(232, 121, 249, 0.2)'
             }}>
-              🚀
+              <img 
+                src="/images/Black Elephant Flat Illustrative Company Logo.png" 
+                alt="Amma Logo" 
+                style={{ 
+                  width: '60px', 
+                  height: '60px',
+                  objectFit: 'contain'
+                }} 
+              />
             </div>
 
             {/* Title */}
