@@ -6,6 +6,7 @@ import Profile from './components/Profile'
 import PatientProfile from './pages/PatientProfile'
 import DoctorProfile from './pages/DoctorProfile'
 import PatientFilesPage from './pages/PatientFilesPage'
+import EpicCallbackPage from './pages/EpicCallbackPage'
 const ammaLogo = '/images/Black Elephant Flat Illustrative Company Logo.png'
 import './App.css'
 
@@ -79,7 +80,7 @@ function HomePage() {
           <div className="hero-stats">
             <div className="stat">
               <div className="stat-number">50%</div>
-              <div className="stat-label">decrease in appointment duration</div>
+              <div className="stat-label">shorter appointments</div>
             </div>
             <div className="stat">
               <div className="stat-number">100+</div>
@@ -418,6 +419,7 @@ function App() {
       <Route path="/patient" element={<PatientProfile />} />
       <Route path="/doctor" element={<DoctorProfile />} />
       <Route path="/patient-files" element={<PatientFilesPage />} />
+      <Route path="/epic-callback" element={<EpicCallbackPage />} />
     </Routes>
   )
 }

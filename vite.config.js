@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [react()],
   base: '/', // Custom domain (amma.today) - use root path
   publicDir: 'public', // Ensure public directory is copied
+  server: {
+    port: 5182 // Custom port for Plasma FHIR demo
+  },
   build: {
     outDir: 'docs',
     emptyOutDir: true,

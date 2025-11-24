@@ -6,24 +6,46 @@ const generateSessionId = () => {
 }
 
 // Create a new session in Supabase
-export const createSession = async (email, name, userType) => {
-  console.log('🔑 Creating session for:', { email, name, userType })
+export const createSession = async (email, name, userType, profilePicture = null) => {
+  console.log('🔑 Creating session for:', { email, name, userType, profilePicture })
   
   const sessionId = generateSessionId()
   const expiresAt = new Date()
   expiresAt.setHours(expiresAt.getHours() + 24) // Session expires in 24 hours
 
-  const { error } = await supabase
-    .from('user_sessions')
-    .insert([{
-      session_id: sessionId,
-      user_email: email,
-      user_name: name,
-      user_type: userType,
-      expires_at: expiresAt.toISOString()
-    }])
+  // Try with profile_picture first
+  let sessionData = {
+    session_id: sessionId,
+    user_email: email,
+    user_name: name,
+    user_type: userType,
+    profile_picture: profilePicture,
+    expires_at: expiresAt.toISOString()
+  }
 
-  if (error) {
+  let { error } = await supabase
+    .from('user_sessions')
+    .insert([sessionData])
+
+  // If error and it's about profile_picture column not existing, retry without it
+  if (error && error.message?.includes('profile_picture')) {
+    console.log('⚠️ profile_picture column not found, retrying without it...')
+    const { session_id, user_email, user_name, user_type, expires_at } = sessionData
+    const { error: retryError } = await supabase
+      .from('user_sessions')
+      .insert([{
+        session_id,
+        user_email,
+        user_name,
+        user_type,
+        expires_at
+      }])
+    
+    if (retryError) {
+      console.error('❌ Error creating session (retry):', retryError)
+      return null
+    }
+  } else if (error) {
     console.error('❌ Error creating session:', error)
     return null
   }
@@ -68,7 +90,8 @@ export const getCurrentSession = async () => {
   return {
     email: data.user_email,
     name: data.user_name,
-    userType: data.user_type
+    userType: data.user_type,
+    profilePicture: data.profile_picture
   }
 }
 

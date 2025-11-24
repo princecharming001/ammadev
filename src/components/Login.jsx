@@ -8,11 +8,10 @@ import './Login.css'
 
 function Login() {
   const navigate = useNavigate()
-  const [showBetaModal, setShowBetaModal] = useState(true)
   
-  const createOrUpdateUser = async (email, name, userType) => {
+  const createOrUpdateUser = async (email, name, userType, profilePicture = null) => {
     try {
-      console.log('🔐 Creating user:', { email, name, userType })
+      console.log('🔐 Creating user:', { email, name, userType, profilePicture })
       
       const nameParts = name.split(' ')
       const firstName = nameParts[0] || name
@@ -31,29 +30,90 @@ function Login() {
       
       if (!existingUser) {
         console.log('📝 Creating new user...')
-        // Create new user
-        const { error } = await supabase
-          .from('users')
-          .insert([{ 
-            email, 
-            first_name: firstName, 
-            last_name: lastName, 
-            user_type: userType 
-          }])
         
-        if (error) {
+        // Generate patient key for new patients
+        let patientKey = null
+        if (userType === 'patient') {
+          patientKey = Math.floor(100000000 + Math.random() * 900000000).toString()
+          console.log('🔑 Generated patient key:', patientKey)
+        }
+        
+        // Try to create user with profile_picture
+        let userData = { 
+          email, 
+          first_name: firstName, 
+          last_name: lastName, 
+          user_type: userType,
+          patient_key: patientKey,
+          profile_picture: profilePicture
+        }
+        
+        let { error } = await supabase
+          .from('users')
+          .insert([userData])
+        
+        // If error due to profile_picture column, retry without it
+        if (error && error.message?.includes('profile_picture')) {
+          console.log('⚠️ profile_picture column not found, creating user without it...')
+          const { email: e, first_name, last_name, user_type, patient_key } = userData
+          const { error: retryError } = await supabase
+            .from('users')
+            .insert([{ email: e, first_name, last_name, user_type, patient_key }])
+          
+          if (retryError) {
+            console.error('❌ Error creating user (retry):', retryError)
+            alert('Error creating account: ' + retryError.message)
+            return false
+          }
+        } else if (error) {
           console.error('❌ Error creating user:', error)
           alert('Error creating account: ' + error.message)
           return false
         }
-        console.log('✅ User created')
+        console.log('✅ User created', profilePicture ? 'with profile picture' : '')
       } else {
         console.log('✅ User already exists')
+        
+        // Update profile picture if provided (backward compatible)
+        if (profilePicture) {
+          try {
+            const { error: updateError } = await supabase
+              .from('users')
+              .update({ profile_picture: profilePicture })
+              .eq('email', email)
+            
+            if (updateError && !updateError.message?.includes('profile_picture')) {
+              console.error('⚠️ Error updating profile picture:', updateError)
+            } else if (!updateError) {
+              console.log('✅ Profile picture updated')
+            }
+          } catch (err) {
+            console.log('⚠️ Could not update profile picture (column may not exist)')
+          }
+        }
+        
+        // Check if existing patient needs a patient_key
+        if (userType === 'patient' && !existingUser.patient_key) {
+          console.log('🔑 Existing patient missing patient_key, generating one...')
+          const patientKey = Math.floor(100000000 + Math.random() * 900000000).toString()
+          
+          const { error: updateError } = await supabase
+            .from('users')
+            .update({ patient_key: patientKey })
+            .eq('email', email)
+          
+          if (updateError) {
+            console.error('❌ Error updating patient_key:', updateError)
+            // Don't fail login, but log the error
+          } else {
+            console.log('✅ Patient key generated and saved:', patientKey)
+          }
+        }
       }
       
       // Create session in Supabase
       console.log('🔑 Creating session...')
-      const sessionId = await createSession(email, name, userType)
+      const sessionId = await createSession(email, name, userType, profilePicture)
       if (!sessionId) {
         console.error('❌ Session creation failed')
         alert('Error creating session. Please try again.')
@@ -74,211 +134,6 @@ function Login() {
 
   return (
     <div className="login-page">
-      {/* Beta Access Modal */}
-      {showBetaModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '1rem'
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
-            borderRadius: '24px',
-            padding: '3rem 2.5rem',
-            maxWidth: '500px',
-            width: '100%',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-            border: '1px solid rgba(232, 121, 249, 0.2)',
-            position: 'relative',
-            animation: 'modalSlideIn 0.4s ease-out'
-          }}>
-            {/* Gradient accent */}
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 'calc(100% - 2px)',
-              height: '6px',
-              background: 'linear-gradient(135deg, #E879F9 0%, #A855F7 100%)',
-              borderRadius: '24px 24px 0 0'
-            }} />
-            
-            {/* Icon */}
-            <div style={{
-              width: '80px',
-              height: '80px',
-              margin: '0 auto 1.5rem',
-              borderRadius: '50%',
-              background: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 8px 24px rgba(232, 121, 249, 0.3)',
-              border: '3px solid rgba(232, 121, 249, 0.2)'
-            }}>
-              <img 
-                src="/images/Black Elephant Flat Illustrative Company Logo.png" 
-                alt="Amma Logo" 
-                style={{ 
-                  width: '60px', 
-                  height: '60px',
-                  objectFit: 'contain'
-                }} 
-              />
-            </div>
-
-            {/* Title */}
-            <h2 style={{
-              fontSize: '2rem',
-              fontWeight: '800',
-              textAlign: 'center',
-              marginBottom: '1rem',
-              background: 'linear-gradient(135deg, #E879F9 0%, #A855F7 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
-            }}>
-              Beta Access Only
-            </h2>
-
-            {/* Message */}
-            <p style={{
-              fontSize: '1.125rem',
-              color: '#666',
-              textAlign: 'center',
-              lineHeight: '1.7',
-              marginBottom: '2rem'
-            }}>
-              We're currently in private beta with select healthcare providers.
-              <br />
-              <strong style={{ color: '#1a1a1a' }}>Launching publicly soon!</strong>
-            </p>
-
-            {/* Stats */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              gap: '1rem',
-              marginBottom: '2rem',
-              padding: '1.5rem',
-              background: 'rgba(232, 121, 249, 0.05)',
-              borderRadius: '12px',
-              border: '1px solid rgba(232, 121, 249, 0.1)'
-            }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#A855F7' }}>100+</div>
-                <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>Clinicians</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#A855F7' }}>5000+</div>
-                <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>Videos</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#A855F7' }}>50%</div>
-                <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>Decrease in appointment lengths</div>
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <button
-                onClick={() => navigate('/')}
-                style={{
-                  padding: '1rem 2rem',
-                  background: 'linear-gradient(135deg, #E879F9 0%, #A855F7 100%)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  color: 'white',
-                  fontSize: '1.05rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 16px rgba(232, 121, 249, 0.4)',
-                  transition: 'all 0.3s ease',
-                  fontFamily: 'inherit'
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.transform = 'translateY(-2px)'
-                  e.target.style.boxShadow = '0 6px 24px rgba(232, 121, 249, 0.5)'
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.transform = 'translateY(0)'
-                  e.target.style.boxShadow = '0 4px 16px rgba(232, 121, 249, 0.4)'
-                }}
-              >
-                ← Back to Homepage
-              </button>
-              
-              <button
-                onClick={() => {
-                  const demoSection = document.querySelector('.demo-toggle-btn')
-                  navigate('/')
-                  setTimeout(() => {
-                    demoSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                  }, 100)
-                }}
-                style={{
-                  padding: '1rem 2rem',
-                  background: 'white',
-                  border: '2px solid #e0e0e0',
-                  borderRadius: '12px',
-                  color: '#666',
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  fontFamily: 'inherit'
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.borderColor = '#A855F7'
-                  e.target.style.color = '#A855F7'
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.borderColor = '#e0e0e0'
-                  e.target.style.color = '#666'
-                }}
-              >
-                📅 Book a Demo
-              </button>
-            </div>
-
-            {/* Footer note */}
-            <p style={{
-              fontSize: '0.875rem',
-              color: '#999',
-              textAlign: 'center',
-              marginTop: '1.5rem',
-              paddingTop: '1.5rem',
-              borderTop: '1px solid #f0f0f0'
-            }}>
-              Interested in early access? Book a demo to learn more.
-            </p>
-          </div>
-        </div>
-      )}
-      
-      <style>{`
-        @keyframes modalSlideIn {
-          from {
-            opacity: 0;
-            transform: translateY(-20px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-      `}</style>
-
       <button className="back-button" onClick={() => navigate('/')}>
         ← Back to Home
       </button>
@@ -295,13 +150,18 @@ function Login() {
               <GoogleLogin
                 onSuccess={async (credentialResponse) => {
                   const decoded = jwtDecode(credentialResponse.credential)
-                  console.log('Patient login:', decoded)
-                  const success = await createOrUpdateUser(decoded.email, decoded.name, 'patient')
+                  console.log('✅ Patient login successful:', {
+                    email: decoded.email,
+                    name: decoded.name,
+                    picture: decoded.picture
+                  })
+                  const success = await createOrUpdateUser(decoded.email, decoded.name, 'patient', decoded.picture)
                   if (success) {
                     navigate('/patient')
                   }
                 }}
                 onError={() => {
+                  console.error('❌ Google login failed')
                   alert('Login failed. Please try again.')
                 }}
               />
@@ -319,13 +179,18 @@ function Login() {
               <GoogleLogin
                 onSuccess={async (credentialResponse) => {
                   const decoded = jwtDecode(credentialResponse.credential)
-                  console.log('Doctor login:', decoded)
-                  const success = await createOrUpdateUser(decoded.email, decoded.name, 'doctor')
+                  console.log('✅ Doctor login successful:', {
+                    email: decoded.email,
+                    name: decoded.name,
+                    picture: decoded.picture
+                  })
+                  const success = await createOrUpdateUser(decoded.email, decoded.name, 'doctor', decoded.picture)
                   if (success) {
                     navigate('/doctor')
                   }
                 }}
                 onError={() => {
+                  console.error('❌ Google login failed')
                   alert('Login failed. Please try again.')
                 }}
               />
